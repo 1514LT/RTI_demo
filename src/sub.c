@@ -20,6 +20,9 @@ DDS_Long test_time = 0;
 DDS_Long start_time = 0;
 DDS_Long end_time = 0;
 DDS_Long recv_packets = 0;
+DDS_Long max_delay = 0;
+DDS_Long min_delay = 0;
+DDS_Long total_delay = 0;
 
 void DataTypeSubscriber_on_data_available(void *listener_data,
                                           DDS_DataReader *reader)
@@ -69,16 +72,25 @@ void DataTypeSubscriber_on_data_available(void *listener_data,
             double throughput = (recv_packets * 64 * 8) / duration_s / (1024 * 1024);
             printf("throughput: %.4f Mbps\n", throughput);
           }
+
           if(recv_packets == 1)
           {
             start_time = get_current_timestamp_ms();
             printf("start_time %lld\n",start_time);
           }
-          if(!test_time)
+          if(!test_time && delay_flag)
           {
-            char timestamp[64];
-            timestamp_to_string(small_sample->timestamp_ns,timestamp,sizeof(timestamp));
-            printf("Received small packet: seq=%lld, timestamp=%s\n",small_sample->sequence_number, timestamp);
+            ll delay = get_current_timestamp_ms() - large_sample->timestamp_ns;
+            total_delay += delay;
+            if (delay > max_delay){max_delay = delay;}   
+            if (min_delay == -1 || delay < min_delay){min_delay = delay;}
+          }
+          if(small_sample->payload[0] == '#' && delay_flag)
+          {
+            double avg_delay = (double)total_delay / recv_packets;
+            printf("avg delay: %.2f ms\n", avg_delay);
+            printf("max delay: %lld ms\n", max_delay);
+            printf("min delay: %lld ms\n", min_delay);
           }
         }
       }
@@ -108,7 +120,7 @@ void DataTypeSubscriber_on_data_available(void *listener_data,
         {
           largePacket *large_sample = largePacketSeq_get_reference(&large_sample_seq, i);
           recv_packets ++;
-          if(large_sample->payload[0] == '#')
+          if(large_sample->payload[0] == '#' && throughput_flag)
           {
             end_time = get_current_timestamp_ms();
             printf("end_time:%lld\n",end_time);
@@ -122,9 +134,19 @@ void DataTypeSubscriber_on_data_available(void *listener_data,
             start_time = get_current_timestamp_ms();
             printf("start_time %lld\n",start_time);
           }
-          if(!test_time)
+          if(!test_time && delay_flag)
           {
-            printf("Received large packet: seq=%lld, timestamp=%lld\n",large_sample->sequence_number, large_sample->timestamp_ns);
+            ll delay = get_current_timestamp_ms() - large_sample->timestamp_ns;
+            total_delay += delay;
+            if (delay > max_delay){max_delay = delay;}   
+            if (min_delay == -1 || delay < min_delay){min_delay = delay;}
+          }
+          if(large_sample->payload[0] == '#' && delay_flag)
+          {
+            double avg_delay = (double)total_delay / recv_packets;
+            printf("avg delay: %.2f ms\n", avg_delay);
+            printf("max delay: %lld ms\n", max_delay);
+            printf("min delay: %lld ms\n", min_delay);
           }
         }
       }
@@ -392,7 +414,7 @@ int subscriber_main_w_args(DDS_Long domain_id, char *udp_intf, char *peer, DDS_L
 
   if (application->count != 0)
   {
-    printf("Running for %d seconds, press Ctrl-C to exit\n", application->count);
+    printf("Running for %d counts, press Ctrl-C to exit\n", application->count);
     OSAPI_Thread_sleep(application->count * 1000);
   }
   else

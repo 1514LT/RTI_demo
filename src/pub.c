@@ -246,6 +246,11 @@ int publisher_main_w_args(DDS_Long domain_id, char *udp_intf, char *peer, DDS_Lo
       {
         small_sample->payload[index] = 'A' + (index % 26); // 循环填充A-Z
       }
+      if(i = application->count - 1)
+      {
+        
+        small_sample->payload[0] = '#';
+      }
       if(atomic_load(&stop_flag))
       {
         small_sample->payload[0] = '#';
@@ -280,6 +285,10 @@ int publisher_main_w_args(DDS_Long domain_id, char *udp_intf, char *peer, DDS_Lo
       for (int index = 0; index < sizeof(large_sample->payload); index++)
       {
         large_sample->payload[index] = 'a' + (index % 26); // 循环填充a-z
+      }
+      if(i = application->count - 1)
+      {
+        large_sample->payload[0] = '#';
       }
       if(atomic_load(&stop_flag))
       {
