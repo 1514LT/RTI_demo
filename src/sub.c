@@ -10,11 +10,16 @@
 #include "DataTypeSupport.h"
 #include "DataTypePlugin.h"
 #include "DataTypeApplication.h"
+#include "Base.h"
 
 DDS_Long throughput_flag = 0;
 DDS_Long delay_flag = 0;
 DDS_Long small_packet_flag = 0;
 DDS_Long large_packet_flag = 0;
+DDS_Long test_time = 0;
+DDS_Long start_time = 0;
+DDS_Long end_time = 0;
+DDS_Long recv_packets = 0;
 
 void DataTypeSubscriber_on_data_available(void *listener_data,
                                           DDS_DataReader *reader)
@@ -54,9 +59,27 @@ void DataTypeSubscriber_on_data_available(void *listener_data,
         if (sample_info->valid_data)
         {
           small_sample = smallPacketSeq_get_reference(&small_sample_seq, i);
-
-          printf("Received small packet: seq=%lld, timestamp=%lld\n",
-                 small_sample->sequence_number, small_sample->timestamp_ns);
+          recv_packets ++;
+          if(small_sample->payload[0] == '#')
+          {
+            end_time = get_current_timestamp_ms();
+            printf("end_time:%lld\n",end_time);
+            printf("recv_packets:%lld\n",recv_packets);
+            double duration_s = (end_time - start_time) / 1000.0;
+            double throughput = (recv_packets * 64 * 8) / duration_s / (1024 * 1024);
+            printf("throughput: %.4f Mbps\n", throughput);
+          }
+          if(recv_packets == 1)
+          {
+            start_time = get_current_timestamp_ms();
+            printf("start_time %lld\n",start_time);
+          }
+          if(!test_time)
+          {
+            char timestamp[64];
+            timestamp_to_string(small_sample->timestamp_ns,timestamp,sizeof(timestamp));
+            printf("Received small packet: seq=%lld, timestamp=%s\n",small_sample->sequence_number, timestamp);
+          }
         }
       }
       smallPacketDataReader_return_loan(small_reader, &small_sample_seq, &info_seq);
@@ -77,7 +100,6 @@ void DataTypeSubscriber_on_data_available(void *listener_data,
     }
     else
     {
-      /* 打印每个有效的大包样本 */
       for (i = 0; i < largePacketSeq_get_length(&large_sample_seq); ++i)
       {
         sample_info = DDS_SampleInfoSeq_get_reference(&large_info_seq, i);
@@ -85,9 +107,25 @@ void DataTypeSubscriber_on_data_available(void *listener_data,
         if (sample_info->valid_data)
         {
           largePacket *large_sample = largePacketSeq_get_reference(&large_sample_seq, i);
-
-          printf("Received large packet: seq=%lld, timestamp=%lld\n",
-                 large_sample->sequence_number, large_sample->timestamp_ns);
+          recv_packets ++;
+          if(large_sample->payload[0] == '#')
+          {
+            end_time = get_current_timestamp_ms();
+            printf("end_time:%lld\n",end_time);
+            printf("recv_packets:%lld\n",recv_packets);
+            double duration_s = (end_time - start_time) / 1000.0;
+            double throughput = (recv_packets * 64 * 8) / duration_s / (1024 * 1024);
+            printf("throughput: %.4f Mbps\n", throughput);
+          }
+          if(recv_packets == 1)
+          {
+            start_time = get_current_timestamp_ms();
+            printf("start_time %lld\n",start_time);
+          }
+          if(!test_time)
+          {
+            printf("Received large packet: seq=%lld, timestamp=%lld\n",large_sample->sequence_number, large_sample->timestamp_ns);
+          }
         }
       }
       largePacketDataReader_return_loan(large_reader, &large_sample_seq, &large_info_seq);
@@ -344,46 +382,6 @@ int subscriber_main_w_args(DDS_Long domain_id, char *udp_intf, char *peer, DDS_L
 
   // 暂时注释掉远程发布断言，因为发布者可能还没有运行
   printf("Skipping remote publication assertions for now...\n");
-  /*
-  rem_publication_data.key.value[DDS_BUILTIN_TOPIC_KEY_OBJECT_ID] = 100;
-  rem_publication_data.topic_name = DDS_String_dup("smallPacketTopic");
-  rem_publication_data.type_name = DDS_String_dup("smallPacket");
-
-  rem_publication_data.reliability.kind = DDS_RELIABLE_RELIABILITY_QOS;
-
-  retcode = DPSE_RemotePublication_assert(
-     application->participant,
-     "publisher",
-     &rem_publication_data,
-     smallPacket_get_key_kind(smallPacketTypePlugin_get(), NULL));
-
-  if (retcode != DDS_RETCODE_OK)
-  {
-      printf("failed to assert remote publication for small packet\n");
-      goto done;
-  }
-
-  // 为largePacket也创建远程发布断言
-  DDS_PublicationBuiltinTopicData_finalize(&rem_publication_data);
-  // 重新初始化结构体
-  memset(&rem_publication_data, 0, sizeof(rem_publication_data));
-  rem_publication_data.key.value[DDS_BUILTIN_TOPIC_KEY_OBJECT_ID] = 101;
-  rem_publication_data.topic_name = DDS_String_dup("largePacketTopic");
-  rem_publication_data.type_name = DDS_String_dup("largePacket");
-  rem_publication_data.reliability.kind = DDS_RELIABLE_RELIABILITY_QOS;
-
-  retcode = DPSE_RemotePublication_assert(
-     application->participant,
-     "publisher",
-     &rem_publication_data,
-     largePacket_get_key_kind(largePacketTypePlugin_get(), NULL));
-
-  if (retcode != DDS_RETCODE_OK)
-  {
-      printf("failed to assert remote publication for large packet\n");
-      goto done;
-  }
-  */
 
   retcode = Application_enable(application);
   if (retcode != DDS_RETCODE_OK)
@@ -523,6 +521,16 @@ int main(int argc, char **argv)
         return -1;
       }
       large_packet_flag = strtol(argv[i], NULL, 0);
+    }
+    else if (!strcmp(argv[i],"-test_time"))
+    {
+      ++i;
+      if (i == argc)
+      {
+        printf("-test_time <size>\n");
+        return -1;
+      }
+      test_time = strtol(argv[i], NULL, 0);
     }
     else if (!strcmp(argv[i], "-h"))
     {

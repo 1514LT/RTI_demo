@@ -11,6 +11,7 @@ set(common_files
   "${CMAKE_CURRENT_SOURCE_DIR}/DataTypeSupport.c"
   "${CMAKE_CURRENT_SOURCE_DIR}/DataTypePlugin.c"
   "${CMAKE_CURRENT_SOURCE_DIR}/DataTypeApplication.c"
+  "${CMAKE_CURRENT_SOURCE_DIR}/Base.c"
 )
 
 # 检查公共文件是否存在

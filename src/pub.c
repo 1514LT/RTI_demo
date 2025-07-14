@@ -9,12 +9,51 @@
 #include "DataType.h"
 #include "DataTypeSupport.h"
 #include "DataTypeApplication.h"
+#include "Base.h"
 
 DDS_Long throughput_flag = 0;
 DDS_Long delay_flag = 0;
 DDS_Long small_packet_flag = 0;
 DDS_Long large_packet_flag = 0;
+DDS_Long test_time = 0;
+atomic_int stop_flag = 0;
 
+// 定义条件变量和互斥锁
+pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
+pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+
+// 定义参数结构体，用于线程传参
+typedef struct {
+    int minutes;
+} TimerArgs;
+
+// 线程执行函数
+void* timer_thread(void* arg)
+{
+  TimerArgs* args = (TimerArgs*)arg;
+  int minutes = args->minutes;
+
+  printf("计时线程开始，等待 %d 分钟...\n", minutes);
+
+  // sleep(minutes * 60);
+  sleep(10);
+  pthread_mutex_lock(&mutex);
+  pthread_cond_signal(&cond);
+  pthread_mutex_unlock(&mutex);
+
+  printf("时间到 %d 分钟，程序退出！\n", minutes);
+}
+
+void handle_stop(void *arg)
+{
+  pthread_mutex_lock(&mutex);
+  pthread_cond_wait(&cond, &mutex);
+
+  atomic_store(&stop_flag,1);
+  printf("handle_stop\n");
+
+  pthread_mutex_unlock(&mutex);
+}
 void smallPacketPublisher_on_publication_matched(void *listener_data,
                                                  DDS_DataWriter *writer,
                                                  const struct DDS_PublicationMatchedStatus *status)
@@ -169,7 +208,6 @@ int publisher_main_w_args(DDS_Long domain_id, char *udp_intf, char *peer, DDS_Lo
       printf("small_datawriter == NULL\n");
       goto done;
     }
-    sleep(1);
     small_hw_datawriter = smallPacketDataWriter_narrow(small_datawriter);
   }
 
@@ -202,12 +240,22 @@ int publisher_main_w_args(DDS_Long domain_id, char *udp_intf, char *peer, DDS_Lo
     {
       // 发送smallPacket
       small_sample->sequence_number = i;
-      // small_sample->timestamp_ns = OSAPI_NtpTime_get_time();
-      small_sample->timestamp_ns = 11;
+      small_sample->timestamp_ns = get_current_timestamp_ms();
       // 填充payload数据
       for (int index = 0; index < sizeof(small_sample->payload); index++)
       {
         small_sample->payload[index] = 'A' + (index % 26); // 循环填充A-Z
+      }
+      if(atomic_load(&stop_flag))
+      {
+        small_sample->payload[0] = '#';
+        retcode = smallPacketDataWriter_write(small_hw_datawriter, small_sample, &DDS_HANDLE_NIL);
+        printf("send last packeg\n");
+        if (retcode != DDS_RETCODE_OK)
+        {
+          printf("Failed to write end small packet\n");
+        }
+        goto done;
       }
       retcode = smallPacketDataWriter_write(small_hw_datawriter, small_sample, &DDS_HANDLE_NIL);
       if (retcode != DDS_RETCODE_OK)
@@ -216,8 +264,10 @@ int publisher_main_w_args(DDS_Long domain_id, char *udp_intf, char *peer, DDS_Lo
       }
       else
       {
-        printf("Sent small packet: seq=%lld, timestamp=%lld\n",
-               small_sample->sequence_number, small_sample->timestamp_ns);
+        if(!test_time)
+        {
+          printf("Sent small packet: seq=%lld, timestamp=%lld\n",small_sample->sequence_number, small_sample->timestamp_ns);
+        }
       }
     }
 
@@ -225,11 +275,22 @@ int publisher_main_w_args(DDS_Long domain_id, char *udp_intf, char *peer, DDS_Lo
     {
       // 发送largePacket
       large_sample->sequence_number = i;
-      large_sample->timestamp_ns = 11;
+      large_sample->timestamp_ns = get_current_timestamp_ms();
       // 填充payload数据
       for (int index = 0; index < sizeof(large_sample->payload); index++)
       {
         large_sample->payload[index] = 'a' + (index % 26); // 循环填充a-z
+      }
+      if(atomic_load(&stop_flag))
+      {
+        large_sample->payload[0] = '#';
+        retcode = smallPacketDataWriter_write(large_hw_datawriter, large_sample, &DDS_HANDLE_NIL);
+        printf("send last packeg\n");
+        if (retcode != DDS_RETCODE_OK)
+        {
+          printf("Failed to write end small packet\n");
+        }
+        goto done;
       }
       retcode = largePacketDataWriter_write(large_hw_datawriter, large_sample, &DDS_HANDLE_NIL);
       if (retcode != DDS_RETCODE_OK)
@@ -238,12 +299,13 @@ int publisher_main_w_args(DDS_Long domain_id, char *udp_intf, char *peer, DDS_Lo
       }
       else
       {
-        printf("Sent large packet: seq=%lld, timestamp=%lld\n",
-               large_sample->sequence_number, large_sample->timestamp_ns);
+        if(!test_time)
+        {
+          printf("Sent large packet: seq=%lld, timestamp=%lld\n",large_sample->sequence_number, large_sample->timestamp_ns);
+        }
       }
     }
-
-    OSAPI_Thread_sleep(application->sleep_time);
+      OSAPI_Thread_sleep(application->sleep_time);
   }
 
 done:
@@ -271,7 +333,7 @@ int main(int argc, char **argv)
   DDS_Long domain_id = 0;
   char *peer = "239.255.0.1";
   char *udp_intf = NULL;
-  DDS_Long sleep_time = 1000;
+  DDS_Long sleep_time = 10;
   DDS_Long count = 0;
 
   for (i = 1; i < argc; ++i)
@@ -366,6 +428,16 @@ int main(int argc, char **argv)
       }
       large_packet_flag = strtol(argv[i], NULL, 0);
     }
+    else if (!strcmp(argv[i],"-test_time"))
+    {
+      ++i;
+      if (i == argc)
+      {
+        printf("-test_time <size>\n");
+        return -1;
+      }
+      test_time = strtol(argv[i], NULL, 0);
+    }
     else if (!strcmp(argv[i], "-h"))
     {
       Application_help(argv[0]);
@@ -376,6 +448,24 @@ int main(int argc, char **argv)
       printf("unknown option: %s\n", argv[i]);
       return -1;
     }
+  }
+  if(test_time)
+  {
+    pthread_t tid;
+    TimerArgs args;
+    args.minutes = test_time;
+    if (pthread_create(&tid, NULL, timer_thread, &args) != 0) 
+    {
+      perror("pthread_create failed");
+      return 1;
+    }
+    pthread_detach(tid);
+    pthread_t tid_stop;
+    if (pthread_create(&tid_stop, NULL, handle_stop, NULL) != 0) 
+    {
+      perror("pthread_create failed");
+      return 1;
+  }
   }
 
   return publisher_main_w_args(domain_id, udp_intf, peer, sleep_time, count);
