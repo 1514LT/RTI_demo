@@ -1,0 +1,11 @@
+struct smallPacket {
+    long long sequence_number; //包序列号
+    long long timestamp_ns; //时间戳
+    char payload [48]; // 数据字段
+};// 总大小64字节
+
+struct largePacket {
+    long long sequence_number; //包序列号
+    long long timestamp_ns; //时间戳
+    char payload[1484]; // 总大小1500字节
+};
