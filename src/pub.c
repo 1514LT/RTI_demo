@@ -36,8 +36,7 @@ void* timer_thread(void* arg)
 
   printf("计时线程开始，等待 %d 分钟...\n", minutes);
 
-  // sleep(minutes * 60);
-  sleep(10);
+  sleep(minutes * 60);
   pthread_mutex_lock(&mutex);
   pthread_cond_signal(&cond);
   pthread_mutex_unlock(&mutex);
