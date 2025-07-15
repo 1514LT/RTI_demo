@@ -233,6 +233,29 @@ int publisher_main_w_args(DDS_Long domain_id, char *udp_intf, char *peer, DDS_Lo
     printf("failed to enable application\n");
     goto done;
   }
+  
+  printf("Waiting for subscriber to match...\n");
+  DDS_Boolean matched = DDS_BOOLEAN_FALSE;
+  int wait_count = 0;
+  const int max_wait_seconds = 30; //
+  while (!matched && wait_count < max_wait_seconds * 10)
+  {
+    struct DDS_PublicationMatchedStatus status;
+    if(small_packet_flag)
+    {
+      retcode = DDS_DataWriter_get_publication_matched_status(small_datawriter, &status);
+    }
+    else
+    {
+      retcode = DDS_DataWriter_get_publication_matched_status(large_datawriter, &status);
+    }
+    if (retcode == DDS_RETCODE_OK && status.current_count > 0)
+    {
+      matched = DDS_BOOLEAN_TRUE;
+      printf("subscriber matched! Current count: %d\n", status.current_count);
+    }
+    OSAPI_Thread_sleep(100); 
+  }
 
   for (i = 0; (application->count > 0 && i < application->count) || (application->count == 0); ++i)
   {
@@ -246,7 +269,7 @@ int publisher_main_w_args(DDS_Long domain_id, char *udp_intf, char *peer, DDS_Lo
       {
         small_sample->payload[index] = 'A' + (index % 26); // 循环填充A-Z
       }
-      if(i = application->count - 1)
+      if(i == application->count - 1)
       {
         
         small_sample->payload[0] = '#';
@@ -276,7 +299,7 @@ int publisher_main_w_args(DDS_Long domain_id, char *udp_intf, char *peer, DDS_Lo
       }
     }
 
-    if (large_packet_flag)
+    else if (large_packet_flag)
     {
       // 发送largePacket
       large_sample->sequence_number = i;
@@ -286,7 +309,7 @@ int publisher_main_w_args(DDS_Long domain_id, char *udp_intf, char *peer, DDS_Lo
       {
         large_sample->payload[index] = 'a' + (index % 26); // 循环填充a-z
       }
-      if(i = application->count - 1)
+      if(i == application->count - 1)
       {
         large_sample->payload[0] = '#';
       }

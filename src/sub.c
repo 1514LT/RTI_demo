@@ -63,7 +63,7 @@ void DataTypeSubscriber_on_data_available(void *listener_data,
         {
           small_sample = smallPacketSeq_get_reference(&small_sample_seq, i);
           recv_packets ++;
-          if(small_sample->payload[0] == '#')
+          if(small_sample->payload[0] == '#' && throughput_flag)
           {
             end_time = get_current_timestamp_ms();
             printf("end_time:%lld\n",end_time);
@@ -77,16 +77,19 @@ void DataTypeSubscriber_on_data_available(void *listener_data,
           {
             start_time = get_current_timestamp_ms();
             printf("start_time %lld\n",start_time);
+            min_delay = get_current_timestamp_ms() - small_sample->timestamp_ns;
           }
           if(!test_time && delay_flag)
           {
-            ll delay = get_current_timestamp_ms() - large_sample->timestamp_ns;
+            ll delay = get_current_timestamp_ms() - small_sample->timestamp_ns;
+            printf("delay:%lld\n",delay);
             total_delay += delay;
             if (delay > max_delay){max_delay = delay;}   
-            if (min_delay == -1 || delay < min_delay){min_delay = delay;}
+            if (delay < min_delay){min_delay = delay;}
           }
           if(small_sample->payload[0] == '#' && delay_flag)
           {
+            printf("recv end packet\n");
             double avg_delay = (double)total_delay / recv_packets;
             printf("avg delay: %.2f ms\n", avg_delay);
             printf("max delay: %lld ms\n", max_delay);
@@ -133,10 +136,12 @@ void DataTypeSubscriber_on_data_available(void *listener_data,
           {
             start_time = get_current_timestamp_ms();
             printf("start_time %lld\n",start_time);
+            min_delay = get_current_timestamp_ms() - large_sample->timestamp_ns;
           }
           if(!test_time && delay_flag)
           {
             ll delay = get_current_timestamp_ms() - large_sample->timestamp_ns;
+            printf("delay:%lld\n",delay);
             total_delay += delay;
             if (delay > max_delay){max_delay = delay;}   
             if (min_delay == -1 || delay < min_delay){min_delay = delay;}
@@ -415,23 +420,23 @@ int subscriber_main_w_args(DDS_Long domain_id, char *udp_intf, char *peer, DDS_L
   if (application->count != 0)
   {
     printf("Running for %d counts, press Ctrl-C to exit\n", application->count);
-    OSAPI_Thread_sleep(application->count * 1000);
   }
   else
   {
-    int sleep_loop_count = (24 * 60 * 60) / 2000;
-    int sleep_loop_left = (24 * 60 * 60) % 2000;
-
     printf("Running for 24 hours, press Ctrl-C to exit\n");
-
-    while (sleep_loop_count)
-    {
-      OSAPI_Thread_sleep(2000 * 1000);
-      --sleep_loop_count;
-    }
-
-    OSAPI_Thread_sleep(sleep_loop_left * 1000);
   }
+
+  int sleep_loop_count = (24 * 60 * 60) / 2000;
+  int sleep_loop_left = (24 * 60 * 60) % 2000;
+
+  while (sleep_loop_count)
+  {
+    OSAPI_Thread_sleep(2000 * 1000);
+    --sleep_loop_count;
+  }
+
+  OSAPI_Thread_sleep(sleep_loop_left * 1000);
+  
 
   Application_delete(application);
 
