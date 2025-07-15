@@ -73,6 +73,7 @@ target_link_libraries(${PUB_TARGET_NAME} PRIVATE
     ${RTI_LIB_PATH}/librti_me_whsmz.a
     ${RTI_LIB_PATH}/librti_mez.a
     pthread
+    m
 )
 target_compile_options(${PUB_TARGET_NAME} PRIVATE)
 
@@ -91,6 +92,7 @@ target_link_libraries(${SUB_TARGET_NAME} PRIVATE
     ${RTI_LIB_PATH}/librti_me_whsmz.a
     ${RTI_LIB_PATH}/librti_mez.a
     pthread
+    m
 )
 target_compile_options(${SUB_TARGET_NAME} PRIVATE)
 

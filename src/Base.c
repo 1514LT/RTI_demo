@@ -3,9 +3,17 @@
 // 获取当前时间戳（毫秒）
 ll get_current_timestamp_ms()
 {
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
-    return (ll)tv.tv_sec * 1000 + tv.tv_usec / 1000;
+  struct timeval tv;
+  gettimeofday(&tv, NULL);
+  return (ll)tv.tv_sec * 1000 + tv.tv_usec / 1000;
+}
+
+// 获取当前时间戳（微秒）
+ll get_current_timestamp_us()
+{
+  struct timeval tv;
+  gettimeofday(&tv, NULL);
+  return (ll)tv.tv_sec * 1000000 + tv.tv_usec;
 }
 
 // 将毫秒时间戳转换为 "yyyy/m/d HH:MM:SS.mmm" 格式字符串

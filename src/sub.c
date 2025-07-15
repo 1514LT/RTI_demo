@@ -23,6 +23,8 @@ DDS_Long recv_packets = 0;
 DDS_Long max_delay = 0;
 DDS_Long min_delay = 0;
 DDS_Long total_delay = 0;
+DDS_Long total_delay_squared = 0;
+DDS_Boolean jitter_flag = DDS_BOOLEAN_FALSE;
 
 void DataTypeSubscriber_on_data_available(void *listener_data,
                                           DDS_DataReader *reader)
@@ -87,6 +89,13 @@ void DataTypeSubscriber_on_data_available(void *listener_data,
             if (delay > max_delay){max_delay = delay;}   
             if (delay < min_delay){min_delay = delay;}
           }
+          else if(!test_time && jitter_flag)
+          {
+            ll delay = get_current_timestamp_us() - small_sample->timestamp_ns;
+            printf("delay:%lld\n",delay);
+            total_delay += delay;
+            total_delay_squared += delay * delay;
+          }
           if(small_sample->payload[0] == '#' && delay_flag)
           {
             printf("recv end packet\n");
@@ -94,6 +103,22 @@ void DataTypeSubscriber_on_data_available(void *listener_data,
             printf("avg delay: %.2f ms\n", avg_delay);
             printf("max delay: %lld ms\n", max_delay);
             printf("min delay: %lld ms\n", min_delay);
+          }
+          else if(small_sample->payload[0] == '#' && jitter_flag)
+          {
+            printf("recv end packet\n");
+            // 平均延迟
+            double avg_delay = (double)total_delay / recv_packets;
+            // 偏差平方和的平均值
+            double avg_delay_squared = (double)total_delay_squared / recv_packets;
+            // 方差 = E[X²] - (E[X])²
+            double variance = avg_delay_squared - (avg_delay * avg_delay);
+            // 标准差抖动
+            double jitter = sqrt(variance);
+  
+            printf("avg delay: %.2f us\n", avg_delay);
+            printf("delay variance: %.2f\n", variance);
+            printf("delay jitter: %.2f us\n", jitter);
           }
         }
       }
@@ -292,7 +317,7 @@ int subscriber_main_w_args(DDS_Long domain_id, char *udp_intf, char *peer, DDS_L
     }
   }
 
-  if (large_packet_flag)
+  else if (large_packet_flag)
   {
     // 创建largePacket的topic
     printf("Registering largePacket type...\n");
@@ -558,6 +583,16 @@ int main(int argc, char **argv)
         return -1;
       }
       test_time = strtol(argv[i], NULL, 0);
+    }
+    else if (!strcmp(argv[i],"-jitter_flag"))
+    {
+      ++i;
+      if (i == argc)
+      {
+        printf("-jitter_flag <value>\n");
+        return -1;
+      }
+      jitter_flag = strtol(argv[i], NULL, 0);
     }
     else if (!strcmp(argv[i], "-h"))
     {

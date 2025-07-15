@@ -17,6 +17,7 @@ DDS_Long small_packet_flag = 0;
 DDS_Long large_packet_flag = 0;
 DDS_Long test_time = 0;
 atomic_int stop_flag = 0;
+DDS_Boolean jitter_flag = DDS_BOOLEAN_FALSE;
 
 // 定义条件变量和互斥锁
 pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
@@ -263,7 +264,8 @@ int publisher_main_w_args(DDS_Long domain_id, char *udp_intf, char *peer, DDS_Lo
     {
       // 发送smallPacket
       small_sample->sequence_number = i;
-      small_sample->timestamp_ns = get_current_timestamp_ms();
+      if(jitter_flag){small_sample->timestamp_ns = get_current_timestamp_us();}
+      else{small_sample->timestamp_ns = get_current_timestamp_ms();}
       // 填充payload数据
       for (int index = 0; index < sizeof(small_sample->payload); index++)
       {
@@ -271,7 +273,6 @@ int publisher_main_w_args(DDS_Long domain_id, char *udp_intf, char *peer, DDS_Lo
       }
       if(i == application->count - 1)
       {
-        
         small_sample->payload[0] = '#';
       }
       if(atomic_load(&stop_flag))
@@ -469,6 +470,16 @@ int main(int argc, char **argv)
         return -1;
       }
       test_time = strtol(argv[i], NULL, 0);
+    }
+    else if (!strcmp(argv[i],"-jitter_flag"))
+    {
+      ++i;
+      if (i == argc)
+      {
+        printf("-jitter_flag <value>\n");
+        return -1;
+      }
+      jitter_flag = strtol(argv[i], NULL, 0);
     }
     else if (!strcmp(argv[i], "-h"))
     {
