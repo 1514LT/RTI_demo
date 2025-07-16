@@ -43,7 +43,6 @@ void DataTypeSubscriber_on_data_available(void *listener_data,
   const DDS_Long TAKE_MAX_SAMPLES = 32;
   DDS_Long i;
 
-  // 尝试读取smallPacket数据
   if (small_reader != NULL && small_packet_flag)
   {
     retcode = smallPacketDataReader_take(small_reader,
@@ -56,7 +55,6 @@ void DataTypeSubscriber_on_data_available(void *listener_data,
     }
     else
     {
-      /* 打印每个有效的小包样本 */
       for (i = 0; i < smallPacketSeq_get_length(&small_sample_seq); ++i)
       {
         sample_info = DDS_SampleInfoSeq_get_reference(&info_seq, i);
@@ -107,14 +105,12 @@ void DataTypeSubscriber_on_data_available(void *listener_data,
           else if(small_sample->payload[0] == '#' && jitter_flag)
           {
             printf("recv end packet\n");
-            // 平均延迟
             double avg_delay = (double)total_delay / recv_packets;
-            // 偏差平方和的平均值
             double avg_delay_squared = (double)total_delay_squared / recv_packets;
-            // 方差 = E[X²] - (E[X])²
+
             double variance = avg_delay_squared - (avg_delay * avg_delay);
-            // 标准差抖动
-            double jitter = sqrt(variance);
+
+            double jitter = rti_sqrt(variance);
   
             printf("avg delay: %.2f us\n", avg_delay);
             printf("delay variance: %.2f\n", variance);
@@ -126,7 +122,7 @@ void DataTypeSubscriber_on_data_available(void *listener_data,
     }
   }
 
-  // 尝试读取largePacket数据
+
   if (large_reader != NULL && large_packet_flag)
   {
     struct DDS_SampleInfoSeq large_info_seq = DDS_SEQUENCE_INITIALIZER;
@@ -271,7 +267,7 @@ int subscriber_main_w_args(DDS_Long domain_id, char *udp_intf, char *peer, DDS_L
   struct DDS_DataReaderListener dr_listener = DDS_DataReaderListener_INITIALIZER;
   struct Application *application;
 
-  // 为smallPacket和largePacket创建单独的topic
+
   DDS_Topic *small_topic = NULL;
   DDS_Topic *large_topic = NULL;
 
@@ -295,7 +291,7 @@ int subscriber_main_w_args(DDS_Long domain_id, char *udp_intf, char *peer, DDS_L
 
   if (small_packet_flag)
   {
-    // 创建smallPacket的topic
+
     retcode = DDS_DomainParticipant_register_type(application->participant,
                                                   "smallPacket",
                                                   smallPacketTypePlugin_get());
@@ -319,7 +315,7 @@ int subscriber_main_w_args(DDS_Long domain_id, char *udp_intf, char *peer, DDS_L
 
   else if (large_packet_flag)
   {
-    // 创建largePacket的topic
+
     printf("Registering largePacket type...\n");
     retcode = DDS_DomainParticipant_register_type(application->participant,
                                                   "largePacket",
@@ -386,10 +382,10 @@ int subscriber_main_w_args(DDS_Long domain_id, char *udp_intf, char *peer, DDS_L
   dr_qos.resource_limits.max_instances = 1;
   dr_qos.history.depth = 32;
 
-  // 为largePacket创建单独的QoS
+
   struct DDS_DataReaderQos large_dr_qos = DDS_DataReaderQos_INITIALIZER;
   large_dr_qos.reliability.kind = DDS_RELIABLE_RELIABILITY_QOS;
-  large_dr_qos.protocol.rtps_object_id = 201; // 使用不同的object_id
+  large_dr_qos.protocol.rtps_object_id = 201; 
   large_dr_qos.resource_limits.max_samples = 32;
   large_dr_qos.resource_limits.max_samples_per_instance = 32;
   large_dr_qos.resource_limits.max_instances = 1;
@@ -397,7 +393,7 @@ int subscriber_main_w_args(DDS_Long domain_id, char *udp_intf, char *peer, DDS_L
 
   if (small_packet_flag)
   {
-    // 创建smallPacket的DataReader
+
     small_datareader = DDS_Subscriber_create_datareader(subscriber,
                                                         DDS_Topic_as_topicdescription(small_topic),
                                                         &dr_qos,
@@ -414,7 +410,7 @@ int subscriber_main_w_args(DDS_Long domain_id, char *udp_intf, char *peer, DDS_L
 
   if (large_packet_flag)
   {
-    // 创建largePacket的DataReader
+
     printf("Creating largePacket DataReader...\n");
     large_datareader = DDS_Subscriber_create_datareader(subscriber,
                                                         DDS_Topic_as_topicdescription(large_topic),
@@ -432,7 +428,7 @@ int subscriber_main_w_args(DDS_Long domain_id, char *udp_intf, char *peer, DDS_L
     printf("largePacket DataReader created successfully\n");
   }
 
-  // 暂时注释掉远程发布断言，因为发布者可能还没有运行
+
   printf("Skipping remote publication assertions for now...\n");
 
   retcode = Application_enable(application);

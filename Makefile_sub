@@ -1,0 +1,26 @@
+# GCCVERSION=$(shell gcc --version)
+RTIMEARCH ?= armvxWorks6.9gcc4.3.3_rtp
+RTIMEHOME ?= ../../../
+
+BUILD_DIR = build
+SRC_DIR = src
+
+TGT_DIR=$(WIND_BASE)/target/usr
+EXE = $(BUILD_DIR)/sub.vxe 
+
+OBJ_DIR=$(shell pwd)
+
+OBJS = $(BUILD_DIR)/DataType.o $(BUILD_DIR)/DataTypeSupport.o $(BUILD_DIR)/DataTypePlugin.o $(BUILD_DIR)/DataTypeApplication.o $(BUILD_DIR)/Base.o $(BUILD_DIR)/sub.o
+
+EXTRA_DEFINE += -DRTI_VXWORKS -fno-builtin -DTOOL=gnu -DCPU=ARMARCH7 -DRTI_RTP -DHAVE_MMAP -DHAVE_UNISTD_H -D__C99__ -D__vxworks__ -D__noudev__ -DWLR_USE_UNSTABLE \
+ 				-std=c99 -fasm -Wall -Wsystem-headers -MD -MP 
+EXTRA_INCLUDE += -I. -I$(RTIMEHOME)/include -I$(RTIMEHOME)/include/rti_me -I$(WIND_USR)/h -I$(WIND_USR)/h/wrn/coreip
+
+LIBS = -mrtp \
+	-L$(RTIMEHOME)/lib/${RTIMEARCH} -L$(RTIMEHOME)/lib/arm-wrs-vxworks -lrti_me_rhsmz$(LIBSUFFIX) -lrti_me_whsmz$(LIBSUFFIX) -lrti_me_discdpdez$(LIBSUFFIX) -lrti_me_discdpdez$(LIBSUFFIX) -lrti_mez$(LIBSUFFIX) \
+	-L$(WIND_BASE)/vxworks-6.9/target/lib_smp/usr/lib/arm/ARMARCH7/common \
+	-lm
+
+ADDED_LIBS += ${LIBS}
+
+include $(WIND_USR)/make/rules.rtp

@@ -6,6 +6,12 @@
 #include "wh_sm/wh_sm_history.h"
 #include "rh_sm/rh_sm_history.h"
 
+// Remove pthread includes and use RTI OSAPI
+// #include <pthread.h>
+#include "osapi/osapi_thread.h"
+#include "osapi/osapi_mutex.h"
+#include "osapi/osapi_semaphore.h"
+
 #include "DataType.h"
 #include "DataTypeSupport.h"
 #include "DataTypeApplication.h"
@@ -19,41 +25,74 @@ DDS_Long test_time = 0;
 atomic_int stop_flag = 0;
 DDS_Boolean jitter_flag = DDS_BOOLEAN_FALSE;
 
-// 定义条件变量和互斥锁
-pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
-pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+// Replace pthread synchronization primitives with RTI OSAPI
+OSAPI_Semaphore_T *cond_semaphore = NULL;
+OSAPI_Mutex_T *mutex = NULL;
 
-// 定义参数结构体，用于线程传参
 typedef struct {
     int minutes;
 } TimerArgs;
 
-// 线程执行函数
-void* timer_thread(void* arg)
+// Convert pthread thread function to RTI thread function
+RTI_BOOL timer_thread(struct OSAPI_ThreadInfo *thread_info)
 {
-  TimerArgs* args = (TimerArgs*)arg;
-  int minutes = args->minutes;
+    TimerArgs* args = (TimerArgs*)thread_info->user_data;
+    int minutes = args->minutes;
 
-  printf("计时线程开始，等待 %d 分钟...\n", minutes);
+    printf("Timer thread started, waiting %d minutes...\n", minutes);
 
-  sleep(minutes * 60);
-  pthread_mutex_lock(&mutex);
-  pthread_cond_signal(&cond);
-  pthread_mutex_unlock(&mutex);
+    // Use RTI thread sleep instead of sleep()
+    OSAPI_Thread_sleep(minutes * 60 * 1000); // Convert to milliseconds
 
-  printf("时间到 %d 分钟，程序退出！\n", minutes);
+    // Signal completion using RTI primitives
+    if (!OSAPI_Mutex_take(mutex)) {
+        printf("Failed to take mutex in timer thread\n");
+        return RTI_FALSE;
+    }
+    
+    if (!OSAPI_Semaphore_give(cond_semaphore)) {
+        printf("Failed to signal semaphore in timer thread\n");
+        OSAPI_Mutex_give(mutex);
+        return RTI_FALSE;
+    }
+    
+    if (!OSAPI_Mutex_give(mutex)) {
+        printf("Failed to give mutex in timer thread\n");
+        return RTI_FALSE;
+    }
+
+    printf("Time expired after %d minutes, program will exit!\n", minutes);
+    return RTI_TRUE;
 }
 
-void handle_stop(void *arg)
+// Convert handle_stop to RTI thread function
+RTI_BOOL handle_stop(struct OSAPI_ThreadInfo *thread_info)
 {
-  pthread_mutex_lock(&mutex);
-  pthread_cond_wait(&cond, &mutex);
+    RTI_INT32 fail_reason;
+    
+    if (!OSAPI_Mutex_take(mutex)) {
+        printf("Failed to take mutex in handle_stop\n");
+        return RTI_FALSE;
+    }
+    
+    // Wait for signal using RTI semaphore
+    if (!OSAPI_Semaphore_take(cond_semaphore, OSAPI_SEMAPHORE_TIMEOUT_INFINITE, &fail_reason)) {
+        printf("Failed to wait on semaphore in handle_stop\n");
+        OSAPI_Mutex_give(mutex);
+        return RTI_FALSE;
+    }
 
-  atomic_store(&stop_flag,1);
-  printf("handle_stop\n");
+    atomic_store(&stop_flag, 1);
+    printf("handle_stop\n");
 
-  pthread_mutex_unlock(&mutex);
+    if (!OSAPI_Mutex_give(mutex)) {
+        printf("Failed to give mutex in handle_stop\n");
+        return RTI_FALSE;
+    }
+    
+    return RTI_TRUE;
 }
+
 void smallPacketPublisher_on_publication_matched(void *listener_data,
                                                  DDS_DataWriter *writer,
                                                  const struct DDS_PublicationMatchedStatus *status)
@@ -98,7 +137,6 @@ int publisher_main_w_args(DDS_Long domain_id, char *udp_intf, char *peer, DDS_Lo
   struct DDS_DataWriterListener small_dw_listener = DDS_DataWriterListener_INITIALIZER;
   struct DDS_DataWriterListener large_dw_listener = DDS_DataWriterListener_INITIALIZER;
 
-  // 为largePacket创建单独的topic
   DDS_Topic *small_topic = NULL;
   DDS_Topic *large_topic = NULL;
 
@@ -130,7 +168,6 @@ int publisher_main_w_args(DDS_Long domain_id, char *udp_intf, char *peer, DDS_Lo
     goto done;
   }
 
-  // publisher已经在Application_create中创建了，直接使用全局变量
   if (publisher == NULL)
   {
     printf("publisher == NULL\n");
@@ -139,7 +176,6 @@ int publisher_main_w_args(DDS_Long domain_id, char *udp_intf, char *peer, DDS_Lo
 
   if (small_packet_flag)
   {
-    // 创建smallPacket的topic
     retcode = DDS_DomainParticipant_register_type(application->participant,
                                                   "smallPacket",
                                                   smallPacketTypePlugin_get());
@@ -164,7 +200,6 @@ int publisher_main_w_args(DDS_Long domain_id, char *udp_intf, char *peer, DDS_Lo
 
   if (large_packet_flag)
   {
-    // 创建largePacket的topic
     retcode = DDS_DomainParticipant_register_type(application->participant,
                                                   "largePacket",
                                                   largePacketTypePlugin_get());
@@ -198,7 +233,6 @@ int publisher_main_w_args(DDS_Long domain_id, char *udp_intf, char *peer, DDS_Lo
 
   if (small_packet_flag)
   {
-    // 创建smallPacket的DataWriter
     small_dw_listener.on_publication_matched = smallPacketPublisher_on_publication_matched;
     small_datawriter = DDS_Publisher_create_datawriter(
         publisher, small_topic, &dw_qos, &small_dw_listener, DDS_PUBLICATION_MATCHED_STATUS);
@@ -213,7 +247,6 @@ int publisher_main_w_args(DDS_Long domain_id, char *udp_intf, char *peer, DDS_Lo
 
   if (large_packet_flag)
   {
-    // 创建largePacket的DataWriter
     large_dw_listener.on_publication_matched = largePacketPublisher_on_publication_matched;
     large_datawriter = DDS_Publisher_create_datawriter(
         publisher, large_topic, &dw_qos, &large_dw_listener, DDS_PUBLICATION_MATCHED_STATUS);
@@ -226,7 +259,6 @@ int publisher_main_w_args(DDS_Long domain_id, char *udp_intf, char *peer, DDS_Lo
     large_hw_datawriter = largePacketDataWriter_narrow(large_datawriter);
   }
 
-  // 确保Application被启用（无论使用哪种包类型）
   retcode = Application_enable(application);
   if (retcode != DDS_RETCODE_OK)
   {
@@ -237,7 +269,7 @@ int publisher_main_w_args(DDS_Long domain_id, char *udp_intf, char *peer, DDS_Lo
   printf("Waiting for subscriber to match...\n");
   DDS_Boolean matched = DDS_BOOLEAN_FALSE;
   int wait_count = 0;
-  const int max_wait_seconds = 30; //
+  const int max_wait_seconds = 30; 
   while (!matched && wait_count < max_wait_seconds * 10)
   {
     struct DDS_PublicationMatchedStatus status;
@@ -261,14 +293,12 @@ int publisher_main_w_args(DDS_Long domain_id, char *udp_intf, char *peer, DDS_Lo
   {
     if (small_packet_flag)
     {
-      // 发送smallPacket
       small_sample->sequence_number = i;
       if(jitter_flag){small_sample->timestamp_ns = get_current_timestamp_us();}
       else{small_sample->timestamp_ns = get_current_timestamp_ms();}
-      // 填充payload数据
       for (int index = 0; index < sizeof(small_sample->payload); index++)
       {
-        small_sample->payload[index] = 'A' + (index % 26); // 循环填充A-Z
+        small_sample->payload[index] = 'A' + (index % 26); 
       }
       if(i == application->count - 1)
       {
@@ -301,13 +331,11 @@ int publisher_main_w_args(DDS_Long domain_id, char *udp_intf, char *peer, DDS_Lo
 
     else if (large_packet_flag)
     {
-      // 发送largePacket
       large_sample->sequence_number = i;
       large_sample->timestamp_ns = get_current_timestamp_ms();
-      // 填充payload数据
       for (int index = 0; index < sizeof(large_sample->payload); index++)
       {
-        large_sample->payload[index] = 'a' + (index % 26); // 循环填充a-z
+        large_sample->payload[index] = 'a' + (index % 26); 
       }
       if(i == application->count - 1)
       {
@@ -493,21 +521,68 @@ int main(int argc, char **argv)
   }
   if(test_time)
   {
-    pthread_t tid;
+    // Initialize synchronization primitives
+    if (!init_sync_primitives()) {
+        printf("Failed to initialize sync primitives\n");
+        return 1;
+    }
+    
+    // Create timer thread using RTI OSAPI
+    struct OSAPI_ThreadProperty timer_thread_prop = OSAPI_THREAD_PROPERTY_DEFAULT;
     TimerArgs args;
     args.minutes = test_time;
-    if (pthread_create(&tid, NULL, timer_thread, &args) != 0) 
-    {
-      perror("pthread_create failed");
-      return 1;
+    
+    struct OSAPI_Thread *timer_thread_handle = OSAPI_Thread_create(
+        "timer_thread",
+        &timer_thread_prop,
+        timer_thread,
+        &args,
+        NULL  // No wakeup routine needed
+    );
+    
+    if (timer_thread_handle == NULL) {
+        printf("Failed to create timer thread\n");
+        cleanup_sync_primitives();
+        return 1;
     }
-    pthread_detach(tid);
-    pthread_t tid_stop;
-    if (pthread_create(&tid_stop, NULL, handle_stop, NULL) != 0) 
-    {
-      perror("pthread_create failed");
-      return 1;
-  }
+    
+    // Start timer thread
+    if (!OSAPI_Thread_start(timer_thread_handle)) {
+        printf("Failed to start timer thread\n");
+        OSAPI_Thread_destroy(timer_thread_handle);
+        cleanup_sync_primitives();
+        return 1;
+    }
+    
+    // Create stop handler thread
+    struct OSAPI_ThreadProperty stop_thread_prop = OSAPI_THREAD_PROPERTY_DEFAULT;
+    
+    struct OSAPI_Thread *stop_thread_handle = OSAPI_Thread_create(
+        "stop_thread",
+        &stop_thread_prop,
+        handle_stop,
+        NULL,
+        NULL  // No wakeup routine needed
+    );
+    
+    if (stop_thread_handle == NULL) {
+        printf("Failed to create stop thread\n");
+        OSAPI_Thread_destroy(timer_thread_handle);
+        cleanup_sync_primitives();
+        return 1;
+    }
+    
+    // Start stop thread
+    if (!OSAPI_Thread_start(stop_thread_handle)) {
+        printf("Failed to start stop thread\n");
+        OSAPI_Thread_destroy(timer_thread_handle);
+        OSAPI_Thread_destroy(stop_thread_handle);
+        cleanup_sync_primitives();
+        return 1;
+    }
+    
+    // Store thread handles for cleanup (you might want to make these global)
+    // For now, we'll let them run and clean up at program exit
   }
 
   return publisher_main_w_args(domain_id, udp_intf, peer, sleep_time, count);
@@ -525,3 +600,36 @@ int subscriber_main(void)
   return publisher_main_w_args(domain_id, udp_intf, peer, sleep_time, count);
 }
 #endif
+
+// Add initialization function
+RTI_BOOL init_sync_primitives()
+{
+    mutex = OSAPI_Mutex_new();
+    if (mutex == NULL) {
+        printf("Failed to create mutex\n");
+        return RTI_FALSE;
+    }
+    
+    cond_semaphore = OSAPI_Semaphore_new();
+    if (cond_semaphore == NULL) {
+        printf("Failed to create semaphore\n");
+        OSAPI_Mutex_delete(mutex);
+        return RTI_FALSE;
+    }
+    
+    return RTI_TRUE;
+}
+
+// Add cleanup function
+void cleanup_sync_primitives()
+{
+    if (cond_semaphore != NULL) {
+        OSAPI_Semaphore_delete(cond_semaphore);
+        cond_semaphore = NULL;
+    }
+    
+    if (mutex != NULL) {
+        OSAPI_Mutex_delete(mutex);
+        mutex = NULL;
+    }
+}
