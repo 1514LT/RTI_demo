@@ -19,7 +19,7 @@ EXTRA_INCLUDE += -I. -I$(RTIMEHOME)/include -I$(RTIMEHOME)/include/rti_me -I$(WI
 LIBS = -mrtp \
 	-L$(RTIMEHOME)/lib/${RTIMEARCH} -L$(RTIMEHOME)/lib/arm-wrs-vxworks -lrti_me_rhsmz$(LIBSUFFIX) -lrti_me_whsmz$(LIBSUFFIX) -lrti_me_discdpdez$(LIBSUFFIX) -lrti_me_discdpdez$(LIBSUFFIX) -lrti_mez$(LIBSUFFIX) \
 	-L$(WIND_BASE)/vxworks-6.9/target/lib_smp/usr/lib/arm/ARMARCH7/common \
-	-lm
+	-lpthread
 
 ADDED_LIBS += ${LIBS}
 

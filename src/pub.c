@@ -6,8 +6,6 @@
 #include "wh_sm/wh_sm_history.h"
 #include "rh_sm/rh_sm_history.h"
 
-// Remove pthread includes and use RTI OSAPI
-// #include <pthread.h>
 #include "osapi/osapi_thread.h"
 #include "osapi/osapi_mutex.h"
 #include "osapi/osapi_semaphore.h"
@@ -17,17 +15,40 @@
 #include "DataTypeApplication.h"
 #include "Base.h"
 
+// Function declarations
+RTI_BOOL init_sync_primitives();
+void cleanup_sync_primitives();
+int get_stop_flag();
+
 DDS_Long throughput_flag = 0;
 DDS_Long delay_flag = 0;
 DDS_Long small_packet_flag = 0;
 DDS_Long large_packet_flag = 0;
 DDS_Long test_time = 0;
-atomic_int stop_flag = 0;
+volatile int stop_flag = 0;
 DDS_Boolean jitter_flag = DDS_BOOLEAN_FALSE;
+
+// Add a flag to track if timer has started
+static volatile int timer_signal_sent = 0;
 
 // Replace pthread synchronization primitives with RTI OSAPI
 OSAPI_Semaphore_T *cond_semaphore = NULL;
 OSAPI_Mutex_T *mutex = NULL;
+OSAPI_Mutex_T *stop_flag_mutex = NULL;  // Mutex to protect stop_flag
+
+// Function to safely read stop_flag
+int get_stop_flag() {
+    int value;
+    if (!OSAPI_Mutex_take(stop_flag_mutex)) {
+        printf("Failed to take stop_flag_mutex in get_stop_flag\n");
+        return 0; // Return 0 (not stopped) if mutex fails
+    }
+    value = stop_flag;
+    if (!OSAPI_Mutex_give(stop_flag_mutex)) {
+        printf("Failed to give stop_flag_mutex in get_stop_flag\n");
+    }
+    return value;
+}
 
 typedef struct {
     int minutes;
@@ -44,6 +65,9 @@ RTI_BOOL timer_thread(struct OSAPI_ThreadInfo *thread_info)
     // Use RTI thread sleep instead of sleep()
     OSAPI_Thread_sleep(minutes * 60 * 1000); // Convert to milliseconds
 
+    // Set flag before sending signal
+    timer_signal_sent = 1;
+    
     // Signal completion using RTI primitives
     if (!OSAPI_Mutex_take(mutex)) {
         printf("Failed to take mutex in timer thread\n");
@@ -56,12 +80,12 @@ RTI_BOOL timer_thread(struct OSAPI_ThreadInfo *thread_info)
         return RTI_FALSE;
     }
     
+    
     if (!OSAPI_Mutex_give(mutex)) {
         printf("Failed to give mutex in timer thread\n");
         return RTI_FALSE;
     }
 
-    printf("Time expired after %d minutes, program will exit!\n", minutes);
     return RTI_TRUE;
 }
 
@@ -70,19 +94,38 @@ RTI_BOOL handle_stop(struct OSAPI_ThreadInfo *thread_info)
 {
     RTI_INT32 fail_reason;
     
+    
+    // Wait for the timer signal in a loop
+    while (timer_signal_sent == 0) {
+        OSAPI_Thread_sleep(100); // Sleep 100ms and check again
+    }
+    
+    
     if (!OSAPI_Mutex_take(mutex)) {
         printf("Failed to take mutex in handle_stop\n");
         return RTI_FALSE;
     }
     
-    // Wait for signal using RTI semaphore
-    if (!OSAPI_Semaphore_take(cond_semaphore, OSAPI_SEMAPHORE_TIMEOUT_INFINITE, &fail_reason)) {
-        printf("Failed to wait on semaphore in handle_stop\n");
+    // Now take the semaphore (should be available since timer_thread gave it)
+    if (!OSAPI_Semaphore_take(cond_semaphore, 1000, &fail_reason)) {
+        printf("Failed to wait on semaphore in handle_stop, fail_reason: %d\n", fail_reason);
         OSAPI_Mutex_give(mutex);
         return RTI_FALSE;
     }
 
-    atomic_store(&stop_flag, 1);
+    // Set stop_flag with mutex protection
+    if (!OSAPI_Mutex_take(stop_flag_mutex)) {
+        printf("Failed to take stop_flag_mutex in handle_stop\n");
+        OSAPI_Mutex_give(mutex);
+        return RTI_FALSE;
+    }
+    
+    stop_flag = 1;
+    
+    if (!OSAPI_Mutex_give(stop_flag_mutex)) {
+        printf("Failed to give stop_flag_mutex in handle_stop\n");
+    }
+    
     printf("handle_stop\n");
 
     if (!OSAPI_Mutex_give(mutex)) {
@@ -304,7 +347,7 @@ int publisher_main_w_args(DDS_Long domain_id, char *udp_intf, char *peer, DDS_Lo
       {
         small_sample->payload[0] = '#';
       }
-      if(atomic_load(&stop_flag))
+      if(get_stop_flag())
       {
         small_sample->payload[0] = '#';
         retcode = smallPacketDataWriter_write(small_hw_datawriter, small_sample, &DDS_HANDLE_NIL);
@@ -341,14 +384,14 @@ int publisher_main_w_args(DDS_Long domain_id, char *udp_intf, char *peer, DDS_Lo
       {
         large_sample->payload[0] = '#';
       }
-      if(atomic_load(&stop_flag))
+      if(get_stop_flag())
       {
         large_sample->payload[0] = '#';
-        retcode = smallPacketDataWriter_write(large_hw_datawriter, large_sample, &DDS_HANDLE_NIL);
+        retcode = largePacketDataWriter_write(large_hw_datawriter, large_sample, &DDS_HANDLE_NIL);
         printf("send last packeg\n");
         if (retcode != DDS_RETCODE_OK)
         {
-          printf("Failed to write end small packet\n");
+          printf("Failed to write end large packet\n");
         }
         goto done;
       }
@@ -610,12 +653,22 @@ RTI_BOOL init_sync_primitives()
         return RTI_FALSE;
     }
     
-    cond_semaphore = OSAPI_Semaphore_new();
-    if (cond_semaphore == NULL) {
-        printf("Failed to create semaphore\n");
+    stop_flag_mutex = OSAPI_Mutex_new();
+    if (stop_flag_mutex == NULL) {
+        printf("Failed to create stop_flag_mutex\n");
         OSAPI_Mutex_delete(mutex);
         return RTI_FALSE;
     }
+    
+    cond_semaphore = OSAPI_Semaphore_new();
+    if (cond_semaphore == NULL) {
+        printf("Failed to create semaphore\n");
+        OSAPI_Mutex_delete(stop_flag_mutex);
+        OSAPI_Mutex_delete(mutex);
+        return RTI_FALSE;
+    }
+    
+    printf("Semaphore initialized (initial value = 1)\n");
     
     return RTI_TRUE;
 }
@@ -626,6 +679,11 @@ void cleanup_sync_primitives()
     if (cond_semaphore != NULL) {
         OSAPI_Semaphore_delete(cond_semaphore);
         cond_semaphore = NULL;
+    }
+    
+    if (stop_flag_mutex != NULL) {
+        OSAPI_Mutex_delete(stop_flag_mutex);
+        stop_flag_mutex = NULL;
     }
     
     if (mutex != NULL) {

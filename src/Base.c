@@ -148,28 +148,3 @@ RTI_UINT32 rti_sqrt_int(RTI_UINT32 x)
     
     return result;
 }
-
-// Wrapper for double precision
-double rti_sqrt(double x)
-{
-    if (x < 0.0) return 0.0;
-    if (x == 0.0) return 0.0;
-    
-    // Scale for integer calculation
-    double scale = 1.0;
-    double scaled_x = x;
-    
-    // Normalize to reasonable range
-    while (scaled_x > 1000000.0) {
-        scaled_x /= 10000.0;
-        scale *= 100.0;
-    }
-    
-    while (scaled_x < 1.0) {
-        scaled_x *= 10000.0;
-        scale /= 100.0;
-    }
-    
-    RTI_UINT32 int_result = rti_sqrt_int((RTI_UINT32)(scaled_x * 1000000.0));
-    return (double)int_result * scale / 1000.0;
-}

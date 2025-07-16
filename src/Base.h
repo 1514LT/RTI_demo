@@ -2,9 +2,6 @@
 #define BASE_H
 #include <stdio.h>
 #include <time.h>
-#include <stdatomic.h>
-// Remove math.h and use RTI alternatives
-// #include <math.h>
 #include "rti_me_c.h"
 #include "osapi/osapi_system.h"
 #include "osapi/osapi_time.h"
