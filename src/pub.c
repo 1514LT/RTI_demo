@@ -39,6 +39,13 @@ OSAPI_Mutex_T *stop_flag_mutex = NULL;  // Mutex to protect stop_flag
 // Function to safely read stop_flag
 int get_stop_flag() {
     int value;
+    
+    // Check if mutex is initialized (only when test_time is used)
+    if (stop_flag_mutex == NULL) {
+        // If mutex is not initialized, just return the stop_flag value directly
+        return stop_flag;
+    }
+    
     if (!OSAPI_Mutex_take(stop_flag_mutex)) {
         printf("Failed to take stop_flag_mutex in get_stop_flag\n");
         return 0; // Return 0 (not stopped) if mutex fails
@@ -167,10 +174,10 @@ void largePacketPublisher_on_publication_matched(void *listener_data,
 extern DDS_Publisher *publisher;
 int publisher_main_w_args(DDS_Long domain_id, char *udp_intf, char *peer, DDS_Long sleep_time, DDS_Long count)
 {
-  DDS_DataWriter *small_datawriter;
-  DDS_DataWriter *large_datawriter;
-  smallPacketDataWriter *small_hw_datawriter;
-  largePacketDataWriter *large_hw_datawriter;
+  DDS_DataWriter *small_datawriter = NULL;
+  DDS_DataWriter *large_datawriter = NULL;
+  smallPacketDataWriter *small_hw_datawriter = NULL;
+  largePacketDataWriter *large_hw_datawriter = NULL;
   struct DDS_DataWriterQos dw_qos = DDS_DataWriterQos_INITIALIZER;
   DDS_ReturnCode_t retcode;
   smallPacket *small_sample = NULL;
