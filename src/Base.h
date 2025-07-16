@@ -2,6 +2,7 @@
 #define BASE_H
 #include <stdio.h>
 #include <time.h>
+#include <sys/time.h>
 #include "rti_me_c.h"
 #include "osapi/osapi_system.h"
 #include "osapi/osapi_time.h"
