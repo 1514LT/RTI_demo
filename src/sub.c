@@ -20,10 +20,10 @@ DDS_Long test_time = 0;
 DDS_Long start_time = 0;
 DDS_Long end_time = 0;
 DDS_Long recv_packets = 0;
-DDS_Long max_delay = 0;
-DDS_Long min_delay = 0;
-DDS_Long total_delay = 0;
-DDS_Long total_delay_squared = 0;
+DDS_LongLong max_delay = 0;
+DDS_LongLong min_delay = 0;
+DDS_LongLong total_delay = 0;
+DDS_LongLong total_delay_squared = 0;
 DDS_Boolean jitter_flag = DDS_BOOLEAN_FALSE;
 
 void DataTypeSubscriber_on_data_available(void *listener_data,
@@ -71,6 +71,7 @@ void DataTypeSubscriber_on_data_available(void *listener_data,
             double duration_s = (end_time - start_time) / 1000.0;
             double throughput = (recv_packets * 64 * 8) / duration_s / (1024 * 1024);
             printf("throughput: %.4f Mbps\n", throughput);
+            recv_packets = 0;
           }
 
           if(recv_packets == 1)
@@ -84,7 +85,7 @@ void DataTypeSubscriber_on_data_available(void *listener_data,
             ll delay = get_current_timestamp_ms() - small_sample->timestamp_ns;
             printf("delay:%lld\n",delay);
             total_delay += delay;
-            if (delay > max_delay){max_delay = delay;}   
+            if (delay > max_delay){max_delay = delay;}
             if (delay < min_delay){min_delay = delay;}
           }
           else if(!test_time && jitter_flag)
@@ -101,6 +102,12 @@ void DataTypeSubscriber_on_data_available(void *listener_data,
             printf("avg delay: %.2f ms\n", avg_delay);
             printf("max delay: %lld ms\n", max_delay);
             printf("min delay: %lld ms\n", min_delay);
+            recv_packets = 0;
+            avg_delay = 0;
+            max_delay = 0;
+            min_delay = 0;
+            total_delay = 0;
+            total_delay_squared = 0;
           }
           else if(small_sample->payload[0] == '#' && jitter_flag)
           {
@@ -115,6 +122,12 @@ void DataTypeSubscriber_on_data_available(void *listener_data,
             printf("avg delay: %.2f us\n", avg_delay);
             printf("delay variance: %.2f\n", variance);
             printf("delay jitter: %.2f us\n", jitter);
+            recv_packets = 0;
+            avg_delay = 0;
+            max_delay = 0;
+            min_delay = 0;
+            total_delay = 0;
+            total_delay_squared = 0;
           }
         }
       }
@@ -152,6 +165,7 @@ void DataTypeSubscriber_on_data_available(void *listener_data,
             double duration_s = (end_time - start_time) / 1000.0;
             double throughput = (recv_packets * 64 * 8) / duration_s / (1024 * 1024);
             printf("throughput: %.4f Mbps\n", throughput);
+            recv_packets = 0;
           }
           if(recv_packets == 1)
           {
@@ -173,6 +187,12 @@ void DataTypeSubscriber_on_data_available(void *listener_data,
             printf("avg delay: %.2f ms\n", avg_delay);
             printf("max delay: %lld ms\n", max_delay);
             printf("min delay: %lld ms\n", min_delay);
+            recv_packets = 0;
+            avg_delay = 0;
+            max_delay = 0;
+            min_delay = 0;
+            total_delay = 0;
+            total_delay_squared = 0;
           }
         }
       }

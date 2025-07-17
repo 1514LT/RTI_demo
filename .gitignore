@@ -2,3 +2,6 @@
 .vscode/*
 build
 build/*
+Makefile
+Makefile_pub
+Makefile_sub
