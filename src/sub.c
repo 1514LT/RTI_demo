@@ -72,6 +72,7 @@ void DataTypeSubscriber_on_data_available(void *listener_data,
             double throughput = (recv_packets * 64 * 8) / duration_s / (1024 * 1024);
             printf("throughput: %.4f Mbps\n", throughput);
             recv_packets = 0;
+            exit(0);
           }
 
           if(recv_packets == 1)
@@ -108,6 +109,7 @@ void DataTypeSubscriber_on_data_available(void *listener_data,
             min_delay = 0;
             total_delay = 0;
             total_delay_squared = 0;
+            exit(0);
           }
           else if(small_sample->payload[0] == '#' && jitter_flag)
           {
@@ -128,6 +130,7 @@ void DataTypeSubscriber_on_data_available(void *listener_data,
             min_delay = 0;
             total_delay = 0;
             total_delay_squared = 0;
+            exit(0);
           }
         }
       }
@@ -166,6 +169,7 @@ void DataTypeSubscriber_on_data_available(void *listener_data,
             double throughput = (recv_packets * 64 * 8) / duration_s / (1024 * 1024);
             printf("throughput: %.4f Mbps\n", throughput);
             recv_packets = 0;
+            exit(0);
           }
           if(recv_packets == 1)
           {
@@ -193,6 +197,7 @@ void DataTypeSubscriber_on_data_available(void *listener_data,
             min_delay = 0;
             total_delay = 0;
             total_delay_squared = 0;
+            exit(0);
           }
         }
       }
@@ -497,6 +502,9 @@ int main(int argc, char **argv)
   char *udp_intf = NULL;
   DDS_Long sleep_time = 1000;
   DDS_Long count = 0;
+  char date[64];
+  timestamp_to_string(get_current_timestamp_ms(), date, sizeof(date));
+  printf("date: %s\n", date);
 
   for (i = 1; i < argc; ++i)
   {

@@ -445,7 +445,9 @@ int main(int argc, char **argv)
   char *udp_intf = NULL;
   DDS_Long sleep_time = 10;
   DDS_Long count = 0;
-
+  char date[64];
+  timestamp_to_string(get_current_timestamp_ms(), date, sizeof(date));
+  printf("date: %s\n", date);
   for (i = 1; i < argc; ++i)
   {
     if (!strcmp(argv[i], "-domain"))
