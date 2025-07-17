@@ -19,6 +19,9 @@
 RTI_BOOL init_sync_primitives();
 void cleanup_sync_primitives();
 int get_stop_flag();
+void update_delay_statistics(DDS_LongLong delay);
+void print_delay_statistics();
+void reset_delay_statistics();
 
 DDS_Long throughput_flag = 0;
 DDS_Long delay_flag = 0;
@@ -35,6 +38,9 @@ DDS_LongLong max_delay = 0;
 DDS_LongLong min_delay = 0;
 DDS_LongLong total_delay = 0;
 DDS_LongLong total_delay_squared = 0;
+
+// Add sent packets counter for pub side statistics
+DDS_Long sent_packets = 0;
 
 // Add a flag to track if timer has started
 static volatile int timer_signal_sent = 0;
@@ -63,6 +69,62 @@ int get_stop_flag() {
         printf("Failed to give stop_flag_mutex in get_stop_flag\n");
     }
     return value;
+}
+
+// Add functions to update delay statistics
+void update_delay_statistics(DDS_LongLong delay)
+{
+    sent_packets++;
+    
+    // Initialize min_delay with first packet delay
+    if (sent_packets == 1) {
+        min_delay = delay;
+    }
+    
+    // Update statistics
+    if (delay > max_delay) {
+        max_delay = delay;
+    }
+    if (delay < min_delay) {
+        min_delay = delay;
+    }
+    total_delay += delay;
+    total_delay_squared += delay * delay;
+}
+
+void print_delay_statistics()
+{
+    if (sent_packets > 0) {
+        if (delay_flag) {
+            double avg_delay = (double)total_delay / sent_packets;
+            printf("=== Pub Side Delay Statistics ===\n");
+            printf("Sent packets: %lld\n", sent_packets);
+            printf("avg delay: %.2f us\n", avg_delay);  // Changed to us for consistency
+            printf("max delay: %lld us\n", max_delay);
+            printf("min delay: %lld us\n", min_delay);
+        }
+        else if (jitter_flag) {
+            double avg_delay = (double)total_delay / sent_packets;
+            double avg_delay_squared = (double)total_delay_squared / sent_packets;
+            double variance = avg_delay_squared - (avg_delay * avg_delay);
+            double jitter = rti_sqrt(variance);
+            
+            printf("=== Pub Side Jitter Statistics ===\n");
+            printf("Sent packets: %lld\n", sent_packets);
+            printf("avg delay: %.2f us\n", avg_delay);
+            printf("delay variance: %.2f\n", variance);
+            printf("delay jitter: %.2f us\n", jitter);
+        }
+    }
+}
+
+void reset_delay_statistics()
+{
+    sent_packets = 0;
+    max_delay = 0;
+    min_delay = 0;
+    total_delay = 0;
+    total_delay_squared = 0;
 }
 
 typedef struct {
@@ -370,8 +432,20 @@ int publisher_main_w_args(DDS_Long domain_id, char *udp_intf, char *peer, DDS_Lo
       if(get_stop_flag())
       {
         small_sample->payload[0] = '#';
+        // Update statistics for final packet
+        ll start_time = get_current_timestamp_us();
         retcode = smallPacketDataWriter_write(small_hw_datawriter, small_sample, &DDS_HANDLE_NIL);
-        printf("send last packeg\n");
+        ll end_time = get_current_timestamp_us();
+        
+        // Update delay statistics based on flag
+        if (delay_flag) {
+            update_delay_statistics(end_time - start_time);
+        } else if (jitter_flag) {
+            update_delay_statistics(end_time - start_time);
+        }
+        
+        printf("send last packet\n");
+        
         if (retcode != DDS_RETCODE_OK)
         {
           printf("Failed to write end small packet\n");
@@ -381,7 +455,12 @@ int publisher_main_w_args(DDS_Long domain_id, char *udp_intf, char *peer, DDS_Lo
       ll start_time = get_current_timestamp_us();
       retcode = smallPacketDataWriter_write(small_hw_datawriter, small_sample, &DDS_HANDLE_NIL);
       ll end_time = get_current_timestamp_us();
-      printf("delay:%lld\n",end_time - start_time);
+      
+      // Update delay statistics based on flag
+      if (delay_flag || jitter_flag) {
+          update_delay_statistics(end_time - start_time);
+      }
+      
       if (retcode != DDS_RETCODE_OK)
       {
         printf("Failed to write small packet\n");
@@ -410,8 +489,20 @@ int publisher_main_w_args(DDS_Long domain_id, char *udp_intf, char *peer, DDS_Lo
       if(get_stop_flag())
       {
         large_sample->payload[0] = '#';
+        // Update statistics for final packet
+        ll start_time = get_current_timestamp_us();
         retcode = largePacketDataWriter_write(large_hw_datawriter, large_sample, &DDS_HANDLE_NIL);
-        printf("send last packeg\n");
+        ll end_time = get_current_timestamp_us();
+        
+        // Update delay statistics based on flag
+        if (delay_flag) {
+            update_delay_statistics(end_time - start_time);
+        } else if (jitter_flag) {
+            update_delay_statistics(end_time - start_time);
+        }
+        
+        printf("send last packet\n");
+        
         if (retcode != DDS_RETCODE_OK)
         {
           printf("Failed to write end large packet\n");
@@ -421,7 +512,12 @@ int publisher_main_w_args(DDS_Long domain_id, char *udp_intf, char *peer, DDS_Lo
       ll start_time = get_current_timestamp_us();
       retcode = largePacketDataWriter_write(large_hw_datawriter, large_sample, &DDS_HANDLE_NIL);
       ll end_time = get_current_timestamp_us();
-      printf("delay:%lld\n",end_time - start_time);
+      
+      // Update delay statistics based on flag
+      if (delay_flag || jitter_flag) {
+          update_delay_statistics(end_time - start_time);
+      }
+      
       if (retcode != DDS_RETCODE_OK)
       {
         printf("Failed to write large packet\n");
@@ -438,6 +534,11 @@ int publisher_main_w_args(DDS_Long domain_id, char *udp_intf, char *peer, DDS_Lo
   }
 
 done:
+
+  // Print final statistics if delay_flag or jitter_flag is enabled
+  if (delay_flag || jitter_flag) {
+    print_delay_statistics();
+  }
 
   Application_delete(application);
 
@@ -467,6 +568,10 @@ int main(int argc, char **argv)
   char date[64];
   timestamp_to_string(get_current_timestamp_ms(), date, sizeof(date));
   printf("date: %s\n", date);
+  
+  // Initialize delay statistics
+  reset_delay_statistics();
+  
   for (i = 1; i < argc; ++i)
   {
     if (!strcmp(argv[i], "-domain"))

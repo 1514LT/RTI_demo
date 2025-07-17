@@ -84,7 +84,6 @@ void DataTypeSubscriber_on_data_available(void *listener_data,
           if(!test_time && delay_flag)
           {
             ll delay = get_current_timestamp_ms() - small_sample->timestamp_ns;
-            printf("delay:%lld\n",delay);
             total_delay += delay;
             if (delay > max_delay){max_delay = delay;}
             if (delay < min_delay){min_delay = delay;}
@@ -92,7 +91,6 @@ void DataTypeSubscriber_on_data_available(void *listener_data,
           else if(!test_time && jitter_flag)
           {
             ll delay = get_current_timestamp_us() - small_sample->timestamp_ns;
-            printf("delay:%lld\n",delay);
             total_delay += delay;
             total_delay_squared += delay * delay;
           }
@@ -100,9 +98,6 @@ void DataTypeSubscriber_on_data_available(void *listener_data,
           {
             printf("recv end packet\n");
             double avg_delay = (double)total_delay / recv_packets;
-            printf("avg delay: %.2f ms\n", avg_delay);
-            printf("max delay: %lld ms\n", max_delay);
-            printf("min delay: %lld ms\n", min_delay);
             recv_packets = 0;
             avg_delay = 0;
             max_delay = 0;
@@ -120,10 +115,6 @@ void DataTypeSubscriber_on_data_available(void *listener_data,
             double variance = avg_delay_squared - (avg_delay * avg_delay);
 
             double jitter = rti_sqrt(variance);
-  
-            printf("avg delay: %.2f us\n", avg_delay);
-            printf("delay variance: %.2f\n", variance);
-            printf("delay jitter: %.2f us\n", jitter);
             recv_packets = 0;
             avg_delay = 0;
             max_delay = 0;
@@ -180,7 +171,6 @@ void DataTypeSubscriber_on_data_available(void *listener_data,
           if(!test_time && delay_flag)
           {
             ll delay = get_current_timestamp_ms() - large_sample->timestamp_ns;
-            printf("delay:%lld\n",delay);
             total_delay += delay;
             if (delay > max_delay){max_delay = delay;}   
             if (min_delay == -1 || delay < min_delay){min_delay = delay;}
@@ -188,9 +178,6 @@ void DataTypeSubscriber_on_data_available(void *listener_data,
           if(large_sample->payload[0] == '#' && delay_flag)
           {
             double avg_delay = (double)total_delay / recv_packets;
-            printf("avg delay: %.2f ms\n", avg_delay);
-            printf("max delay: %lld ms\n", max_delay);
-            printf("min delay: %lld ms\n", min_delay);
             recv_packets = 0;
             avg_delay = 0;
             max_delay = 0;
