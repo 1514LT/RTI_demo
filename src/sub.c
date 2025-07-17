@@ -402,19 +402,19 @@ int subscriber_main_w_args(DDS_Long domain_id, char *udp_intf, char *peer, DDS_L
   */
 
   dr_qos.protocol.rtps_object_id = 200;
-  dr_qos.resource_limits.max_samples = 32;
-  dr_qos.resource_limits.max_samples_per_instance = 32;
+  dr_qos.resource_limits.max_samples = 1;
+  dr_qos.resource_limits.max_samples_per_instance = 1;
   dr_qos.resource_limits.max_instances = 1;
-  dr_qos.history.depth = 32;
+  dr_qos.history.depth = 1;
 
 
   struct DDS_DataReaderQos large_dr_qos = DDS_DataReaderQos_INITIALIZER;
   large_dr_qos.reliability.kind = DDS_RELIABLE_RELIABILITY_QOS;
   large_dr_qos.protocol.rtps_object_id = 201; 
-  large_dr_qos.resource_limits.max_samples = 32;
-  large_dr_qos.resource_limits.max_samples_per_instance = 32;
+  large_dr_qos.resource_limits.max_samples = 1;
+  large_dr_qos.resource_limits.max_samples_per_instance = 1;
   large_dr_qos.resource_limits.max_instances = 1;
-  large_dr_qos.history.depth = 32;
+  large_dr_qos.history.depth = 1;
 
   if (small_packet_flag)
   {

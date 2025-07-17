@@ -28,6 +28,14 @@ DDS_Long test_time = 0;
 volatile int stop_flag = 0;
 DDS_Boolean jitter_flag = DDS_BOOLEAN_FALSE;
 
+DDS_Long start_time = 0;
+DDS_Long end_time = 0;
+DDS_Long recv_packets = 0;
+DDS_LongLong max_delay = 0;
+DDS_LongLong min_delay = 0;
+DDS_LongLong total_delay = 0;
+DDS_LongLong total_delay_squared = 0;
+
 // Add a flag to track if timer has started
 static volatile int timer_signal_sent = 0;
 
@@ -273,11 +281,16 @@ int publisher_main_w_args(DDS_Long domain_id, char *udp_intf, char *peer, DDS_Lo
   }
 
   dw_qos.reliability.kind = DDS_RELIABLE_RELIABILITY_QOS;
-  dw_qos.resource_limits.max_samples_per_instance = 32;
-  dw_qos.resource_limits.max_instances = 2;
-  dw_qos.resource_limits.max_samples =
-      dw_qos.resource_limits.max_instances * dw_qos.resource_limits.max_samples_per_instance;
-  dw_qos.history.depth = 32;
+  // dw_qos.resource_limits.max_samples_per_instance = 32;
+  // dw_qos.resource_limits.max_instances = 2;
+  // dw_qos.resource_limits.max_samples =
+  //     dw_qos.resource_limits.max_instances * dw_qos.resource_limits.max_samples_per_instance;
+  // dw_qos.history.depth = 32;
+  // 如果改为队列=1的配置：
+  dw_qos.resource_limits.max_samples = 1;           // 总共1个样本
+  dw_qos.resource_limits.max_samples_per_instance = 1; // 每实例1个样本
+  dw_qos.resource_limits.max_instances = 1;         // 1个实例
+  dw_qos.history.depth = 1;                        // 历史深度1
   dw_qos.protocol.rtps_reliable_writer.heartbeat_period.sec = 0;
   dw_qos.protocol.rtps_reliable_writer.heartbeat_period.nanosec = 250000000;
 
@@ -365,7 +378,10 @@ int publisher_main_w_args(DDS_Long domain_id, char *udp_intf, char *peer, DDS_Lo
         }
         goto done;
       }
+      ll start_time = get_current_timestamp_us();
       retcode = smallPacketDataWriter_write(small_hw_datawriter, small_sample, &DDS_HANDLE_NIL);
+      ll end_time = get_current_timestamp_us();
+      printf("delay:%lld\n",end_time - start_time);
       if (retcode != DDS_RETCODE_OK)
       {
         printf("Failed to write small packet\n");
@@ -402,7 +418,10 @@ int publisher_main_w_args(DDS_Long domain_id, char *udp_intf, char *peer, DDS_Lo
         }
         goto done;
       }
+      ll start_time = get_current_timestamp_us();
       retcode = largePacketDataWriter_write(large_hw_datawriter, large_sample, &DDS_HANDLE_NIL);
+      ll end_time = get_current_timestamp_us();
+      printf("delay:%lld\n",end_time - start_time);
       if (retcode != DDS_RETCODE_OK)
       {
         printf("Failed to write large packet\n");
