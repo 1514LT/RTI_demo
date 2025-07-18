@@ -7,8 +7,8 @@ For more information, type 'rtiddsgen -help' at a command shell
 or consult the RTI Data Distribution Service manual.
 */
 
-#ifndef DataTypePlugin_814104889_h
-#define DataTypePlugin_814104889_h
+#ifndef DataTypePlugin_814104885_h
+#define DataTypePlugin_814104885_h
 
 #include "DataType.h"
 
@@ -119,5 +119,5 @@ largePacket_get_serialized_sample_max_size(
 #endif
 #endif
 
-#endif /* DataTypePlugin_814104889_h */
+#endif /* DataTypePlugin_814104885_h */
 

@@ -7,7 +7,11 @@
 #include "osapi/osapi_system.h"
 #include "osapi/osapi_time.h"
 #include "osapi/osapi_log.h"
-
+#ifndef LINUX
+#include <sysLib.h>     // sysClkRateGet
+#include <tickLib.h>    // tickGet
+#include <inttypes.h>
+#endif
 typedef long long ll;
 
 extern ll get_current_timestamp_ms();

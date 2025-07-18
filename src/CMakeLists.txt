@@ -4,7 +4,7 @@ set(SUB_TARGET_NAME "sub")
 
 # 设置RTI静态库路径
 set(RTI_LIB_PATH "${CMAKE_SOURCE_DIR}/thirdparty/rti_dds_micro/lib")
-
+add_definitions(-DLINUX)
 # 公共源文件（DataType相关文件）
 set(common_files
   "${CMAKE_CURRENT_SOURCE_DIR}/DataType.c"

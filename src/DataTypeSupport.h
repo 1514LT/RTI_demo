@@ -7,8 +7,8 @@ For more information, type 'rtiddsgen -help' at a command shell
 or consult the RTI Data Distribution Service manual.
 */
 
-#ifndef DataTypeSupport_814104889_h
-#define DataTypeSupport_814104889_h
+#ifndef DataTypeSupport_814104885_h
+#define DataTypeSupport_814104885_h
 
 #include <stdlib.h>
 
@@ -74,5 +74,5 @@ DDS_DATAREADER_C(largePacketDataReader, largePacketSeq, largePacket);
 #endif
 #endif
 
-#endif  /* DataTypeSupport_814104889_h */
+#endif  /* DataTypeSupport_814104885_h */
 

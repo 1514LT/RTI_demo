@@ -114,7 +114,7 @@ largePacket_initialize(largePacket* sample)
     CDR_Primitive_init_long_long(&sample->sequence_number);
     CDR_Primitive_init_long_long(&sample->timestamp_ns);
     CDR_Primitive_init_array(
-        sample->payload, ((1484)*CDR_CHAR_SIZE));
+        sample->payload, ((1048560)*CDR_CHAR_SIZE));
     return RTI_TRUE;
 }
 
@@ -163,7 +163,7 @@ largePacket_copy(largePacket* dst,const largePacket* src)
     }
     CDR_Primitive_copy_long_long(&dst->sequence_number, &src->sequence_number);
     CDR_Primitive_copy_long_long(&dst->timestamp_ns, &src->timestamp_ns);
-    CDR_Primitive_copy_array(dst->payload,src->payload,((1484)*CDR_CHAR_SIZE));
+    CDR_Primitive_copy_array(dst->payload,src->payload,((1048560)*CDR_CHAR_SIZE));
     return RTI_TRUE;
 }
 

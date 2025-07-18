@@ -1,17 +1,36 @@
 #include "Base.h"
 
+#ifndef LINUX
+#endif
 ll get_current_timestamp_ms()
 {
+  #ifndef LINUX
+  int ticks = tickGet();
+  // int newRate = 1000000;
+  // if (sysClkRateSet(newRate) == ERROR) {
+  // printf("Error in setting clock rate!\n");
+  // return;
+  // }
+  int clk_rate = sysClkRateGet();
+  return ((int64_t)ticks * 1000) / clk_rate;
+  #else
   struct timeval tv;
   gettimeofday(&tv, NULL);
   return (ll)tv.tv_sec * 1000 + tv.tv_usec / 1000;
+  #endif
 }
 
 ll get_current_timestamp_us()
 {
+  #ifndef LINUX
+  int ticks = tickGet();
+  int clk_rate = sysClkRateGet();
+  return ((int64_t)ticks * 1000000) / clk_rate;
+  #else
   struct timeval tv;
   gettimeofday(&tv, NULL);
   return (ll)tv.tv_sec * 1000000 + tv.tv_usec;
+  #endif
 }
 
 void timestamp_to_string(ll timestamp_ms, char *buffer, int buffer_size)

@@ -34,13 +34,13 @@ DDS_Boolean jitter_flag = DDS_BOOLEAN_FALSE;
 DDS_Long start_time = 0;
 DDS_Long end_time = 0;
 DDS_Long recv_packets = 0;
-DDS_LongLong max_delay = 0;
-DDS_LongLong min_delay = 0;
-DDS_LongLong total_delay = 0;
-DDS_LongLong total_delay_squared = 0;
+DDS_Long max_delay = 0;
+DDS_Long min_delay = 0;
+DDS_Long total_delay = 0;
+DDS_Long total_delay_squared = 0;
 
 // Add sent packets counter for pub side statistics
-DDS_Long sent_packets = 0;
+DDS_LongLong sent_packets = 0;
 
 // Add a flag to track if timer has started
 static volatile int timer_signal_sent = 0;
@@ -74,10 +74,9 @@ int get_stop_flag() {
 // Add functions to update delay statistics
 void update_delay_statistics(DDS_LongLong delay)
 {
-    sent_packets++;
-    
+    printf("delay:%ld us\n",delay);
     // Initialize min_delay with first packet delay
-    if (sent_packets == 1) {
+    if (sent_packets == 0) {
         min_delay = delay;
     }
     
@@ -85,23 +84,24 @@ void update_delay_statistics(DDS_LongLong delay)
     if (delay > max_delay) {
         max_delay = delay;
     }
-    if (delay < min_delay) {
+    else if (delay < min_delay) {
         min_delay = delay;
     }
-    total_delay += delay;
-    total_delay_squared += delay * delay;
+    // total_delay += delay;
+    // total_delay_squared += delay * delay;
+    sent_packets += 5000;
 }
 
 void print_delay_statistics()
 {
     if (sent_packets > 0) {
         if (delay_flag) {
-            double avg_delay = (double)total_delay / sent_packets;
+            // double avg_delay = (double)total_delay / sent_packets;
             printf("=== Pub Side Delay Statistics ===\n");
-            printf("Sent packets: %lld\n", sent_packets);
-            printf("avg delay: %.2f us\n", avg_delay);  // Changed to us for consistency
-            printf("max delay: %lld us\n", max_delay);
-            printf("min delay: %lld us\n", min_delay);
+            printf("Sent packets: %ld\n", sent_packets);
+            // printf("avg delay: %.2f ms\n", avg_delay);  // Changed to ms for consistency
+            printf("max delay: %ld us\n", max_delay);
+            printf("min delay: %ld us\n", min_delay);
         }
         else if (jitter_flag) {
             double avg_delay = (double)total_delay / sent_packets;
@@ -110,10 +110,10 @@ void print_delay_statistics()
             double jitter = rti_sqrt(variance);
             
             printf("=== Pub Side Jitter Statistics ===\n");
-            printf("Sent packets: %lld\n", sent_packets);
-            printf("avg delay: %.2f us\n", avg_delay);
+            printf("Sent packets: %ld\n", sent_packets);
+            printf("avg delay: %.2f ms\n", avg_delay);
             printf("delay variance: %.2f\n", variance);
-            printf("delay jitter: %.2f us\n", jitter);
+            printf("delay jitter: %.2f ms\n", jitter);
         }
     }
 }
@@ -419,7 +419,7 @@ int publisher_main_w_args(DDS_Long domain_id, char *udp_intf, char *peer, DDS_Lo
     if (small_packet_flag)
     {
       small_sample->sequence_number = i;
-      if(jitter_flag){small_sample->timestamp_ns = get_current_timestamp_us();}
+      if(jitter_flag){small_sample->timestamp_ns = get_current_timestamp_ms();}
       else{small_sample->timestamp_ns = get_current_timestamp_ms();}
       for (int index = 0; index < sizeof(small_sample->payload); index++)
       {
@@ -452,14 +452,29 @@ int publisher_main_w_args(DDS_Long domain_id, char *udp_intf, char *peer, DDS_Lo
         }
         goto done;
       }
+      #if 1
+      ll start_time = get_current_timestamp_us();
+      for(int j = 0; j < 100; j++)
+      {
+        retcode = smallPacketDataWriter_write(small_hw_datawriter, small_sample, &DDS_HANDLE_NIL);
+      }
+      ll end_time = get_current_timestamp_us();
+      if(i < 10)
+      {
+        continue;
+      }
+      update_delay_statistics((end_time - start_time) / 100);
+      print_delay_statistics();
+      #else
       ll start_time = get_current_timestamp_us();
       retcode = smallPacketDataWriter_write(small_hw_datawriter, small_sample, &DDS_HANDLE_NIL);
       ll end_time = get_current_timestamp_us();
-      
-      // Update delay statistics based on flag
-      if (delay_flag || jitter_flag) {
-          update_delay_statistics(end_time - start_time);
-      }
+      printf("start_time:%lld\n",start_time);
+      printf("end_time:%lld\n",end_time);
+      ll delay_time = end_time - start_time;
+      printf("delay_time:%lld\n",delay_time);
+      #endif
+
       
       if (retcode != DDS_RETCODE_OK)
       {
@@ -490,9 +505,9 @@ int publisher_main_w_args(DDS_Long domain_id, char *udp_intf, char *peer, DDS_Lo
       {
         large_sample->payload[0] = '#';
         // Update statistics for final packet
-        ll start_time = get_current_timestamp_us();
+        ll start_time = get_current_timestamp_ms();
         retcode = largePacketDataWriter_write(large_hw_datawriter, large_sample, &DDS_HANDLE_NIL);
-        ll end_time = get_current_timestamp_us();
+        ll end_time = get_current_timestamp_ms();
         
         // Update delay statistics based on flag
         if (delay_flag) {
@@ -509,14 +524,21 @@ int publisher_main_w_args(DDS_Long domain_id, char *udp_intf, char *peer, DDS_Lo
         }
         goto done;
       }
+      #if 1
       ll start_time = get_current_timestamp_us();
-      retcode = largePacketDataWriter_write(large_hw_datawriter, large_sample, &DDS_HANDLE_NIL);
-      ll end_time = get_current_timestamp_us();
-      
-      // Update delay statistics based on flag
-      if (delay_flag || jitter_flag) {
-          update_delay_statistics(end_time - start_time);
+      for(int j = 0; j < 100; j++)
+      {
+        retcode = largePacketDataWriter_write(large_hw_datawriter, large_sample, &DDS_HANDLE_NIL);
       }
+      ll end_time = get_current_timestamp_us();
+      if(i < 10)
+      {
+        continue;
+      }
+      update_delay_statistics((end_time - start_time) / 100);
+      print_delay_statistics();
+      #else
+      #endif
       
       if (retcode != DDS_RETCODE_OK)
       {
@@ -568,6 +590,14 @@ int main(int argc, char **argv)
   char date[64];
   timestamp_to_string(get_current_timestamp_ms(), date, sizeof(date));
   printf("date: %s\n", date);
+  #ifndef LINUX
+    // int ticks = tickGet();
+    // int newRate = 1000000;
+    // if (sysClkRateSet(newRate) == ERROR) {
+    // printf("Error in setting clock rate!\n");
+    // return -1;
+    // }
+  #endif
   
   // Initialize delay statistics
   reset_delay_statistics();

@@ -90,7 +90,7 @@ void DataTypeSubscriber_on_data_available(void *listener_data,
           }
           else if(!test_time && jitter_flag)
           {
-            ll delay = get_current_timestamp_us() - small_sample->timestamp_ns;
+            ll delay = get_current_timestamp_ms() - small_sample->timestamp_ns;
             total_delay += delay;
             total_delay_squared += delay * delay;
           }
@@ -178,6 +178,7 @@ void DataTypeSubscriber_on_data_available(void *listener_data,
           if(large_sample->payload[0] == '#' && delay_flag)
           {
             double avg_delay = (double)total_delay / recv_packets;
+            printf("recv end pack\n");
             recv_packets = 0;
             avg_delay = 0;
             max_delay = 0;
@@ -492,6 +493,9 @@ int main(int argc, char **argv)
   char date[64];
   timestamp_to_string(get_current_timestamp_ms(), date, sizeof(date));
   printf("date: %s\n", date);
+  #ifndef LINUX
+  printf("System clock rate: %d ticks/sec\n", sysClkRateGet());
+  #endif
 
   for (i = 1; i < argc; ++i)
   {
