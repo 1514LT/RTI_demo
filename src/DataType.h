@@ -7,8 +7,8 @@ For more information, type 'rtiddsgen -help' at a command shell
 or consult the RTI Data Distribution Service manual.
 */
 
-#ifndef DataType_814104885_h
-#define DataType_814104885_h
+#ifndef DataType_814104882_h
+#define DataType_814104882_h
 
 #ifndef rti_me_c_h
 #include "rti_me_c.h"
@@ -70,7 +70,7 @@ typedef struct largePacket
 
     CDR_LongLong sequence_number;
     CDR_LongLong timestamp_ns;
-    CDR_Char payload[1048560];
+    CDR_Char payload[1484];
 
 } largePacket ;
 

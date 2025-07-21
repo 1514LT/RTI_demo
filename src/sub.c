@@ -149,7 +149,7 @@ void DataTypeSubscriber_on_data_available(void *listener_data,
 
         if (sample_info->valid_data)
         {
-          largePacket *large_sample = largePacketSeq_get_reference(&large_sample_seq, i);
+          largePacket *large_sample = largePacketSeq_get_reference(&large_sample_seq, i); 
           recv_packets ++;
           if(large_sample->payload[0] == '#' && throughput_flag)
           {
@@ -157,7 +157,7 @@ void DataTypeSubscriber_on_data_available(void *listener_data,
             printf("end_time:%lld\n",end_time);
             printf("recv_packets:%lld\n",recv_packets);
             double duration_s = (end_time - start_time) / 1000.0;
-            double throughput = (recv_packets * 64 * 8) / duration_s / (1024 * 1024);
+            double throughput = (recv_packets * 1500 * 8) / duration_s / (1024 * 1024);
             printf("throughput: %.4f Mbps\n", throughput);
             recv_packets = 0;
             exit(0);
@@ -485,7 +485,7 @@ done:
 int main(int argc, char **argv)
 {
   DDS_Long i = 0;
-  DDS_Long domain_id = 0;
+  DDS_Long domain_id = 5;
   char *peer = NULL;
   char *udp_intf = NULL;
   DDS_Long sleep_time = 1000;

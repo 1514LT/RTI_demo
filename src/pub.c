@@ -438,9 +438,7 @@ int publisher_main_w_args(DDS_Long domain_id, char *udp_intf, char *peer, DDS_Lo
         ll end_time = get_current_timestamp_us();
         
         // Update delay statistics based on flag
-        if (delay_flag) {
-            update_delay_statistics(end_time - start_time);
-        } else if (jitter_flag) {
+        if (delay_flag || jitter_flag) {
             update_delay_statistics(end_time - start_time);
         }
         
@@ -452,28 +450,25 @@ int publisher_main_w_args(DDS_Long domain_id, char *udp_intf, char *peer, DDS_Lo
         }
         goto done;
       }
-      #if 1
-      ll start_time = get_current_timestamp_us();
-      for(int j = 0; j < 100; j++)
+      if(delay_flag)
+      {
+        ll start_time = get_current_timestamp_us();
+        for(int j = 0; j < 100; j++)
+        {
+          retcode = smallPacketDataWriter_write(small_hw_datawriter, small_sample, &DDS_HANDLE_NIL);
+        }
+        ll end_time = get_current_timestamp_us();
+        if(i < 10)
+        {
+          continue;
+        }
+        update_delay_statistics((end_time - start_time) / 100);
+        print_delay_statistics();
+      }
+      else // throughput_flag
       {
         retcode = smallPacketDataWriter_write(small_hw_datawriter, small_sample, &DDS_HANDLE_NIL);
       }
-      ll end_time = get_current_timestamp_us();
-      if(i < 10)
-      {
-        continue;
-      }
-      update_delay_statistics((end_time - start_time) / 100);
-      print_delay_statistics();
-      #else
-      ll start_time = get_current_timestamp_us();
-      retcode = smallPacketDataWriter_write(small_hw_datawriter, small_sample, &DDS_HANDLE_NIL);
-      ll end_time = get_current_timestamp_us();
-      printf("start_time:%lld\n",start_time);
-      printf("end_time:%lld\n",end_time);
-      ll delay_time = end_time - start_time;
-      printf("delay_time:%lld\n",delay_time);
-      #endif
 
       
       if (retcode != DDS_RETCODE_OK)
@@ -505,9 +500,7 @@ int publisher_main_w_args(DDS_Long domain_id, char *udp_intf, char *peer, DDS_Lo
       {
         large_sample->payload[0] = '#';
         // Update statistics for final packet
-        ll start_time = get_current_timestamp_ms();
         retcode = largePacketDataWriter_write(large_hw_datawriter, large_sample, &DDS_HANDLE_NIL);
-        ll end_time = get_current_timestamp_ms();
         
         // Update delay statistics based on flag
         if (delay_flag) {
@@ -522,23 +515,31 @@ int publisher_main_w_args(DDS_Long domain_id, char *udp_intf, char *peer, DDS_Lo
         {
           printf("Failed to write end large packet\n");
         }
+        // OSAPI_Thread_sleep(application->sleep_time);
         goto done;
       }
-      #if 1
-      ll start_time = get_current_timestamp_us();
-      for(int j = 0; j < 100; j++)
+      if(delay_flag)
+      {
+        if(i < 10)
+        {
+          continue;
+        }
+        ll start_time = get_current_timestamp_us();
+        for(int j = 0; j < 100; j++)
+        {
+          for(int z = 0;z < 700;z++)
+          {
+            retcode = largePacketDataWriter_write(large_hw_datawriter, large_sample, &DDS_HANDLE_NIL);
+          }
+        }
+        ll end_time = get_current_timestamp_us();
+        update_delay_statistics((end_time - start_time) / 100);
+        print_delay_statistics();
+      }
+      else //throughput_flag
       {
         retcode = largePacketDataWriter_write(large_hw_datawriter, large_sample, &DDS_HANDLE_NIL);
       }
-      ll end_time = get_current_timestamp_us();
-      if(i < 10)
-      {
-        continue;
-      }
-      update_delay_statistics((end_time - start_time) / 100);
-      print_delay_statistics();
-      #else
-      #endif
       
       if (retcode != DDS_RETCODE_OK)
       {
@@ -582,7 +583,7 @@ done:
 int main(int argc, char **argv)
 {
   DDS_Long i = 0;
-  DDS_Long domain_id = 0;
+  DDS_Long domain_id = 5;
   char *peer = "239.255.0.1";
   char *udp_intf = NULL;
   DDS_Long sleep_time = 10;
@@ -590,14 +591,6 @@ int main(int argc, char **argv)
   char date[64];
   timestamp_to_string(get_current_timestamp_ms(), date, sizeof(date));
   printf("date: %s\n", date);
-  #ifndef LINUX
-    // int ticks = tickGet();
-    // int newRate = 1000000;
-    // if (sysClkRateSet(newRate) == ERROR) {
-    // printf("Error in setting clock rate!\n");
-    // return -1;
-    // }
-  #endif
   
   // Initialize delay statistics
   reset_delay_statistics();

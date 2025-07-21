@@ -7,5 +7,5 @@ struct smallPacket {
 struct largePacket {
     long long sequence_number; //包序列号
     long long timestamp_ns; //时间戳
-    char payload[8176]; // 总大小8KB
+    char payload[1484]; // 总大小8KB
 };

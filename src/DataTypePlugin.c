@@ -217,7 +217,7 @@ largePacket_cdr_serialize(
     if (!CDR_Stream_serialize_primitive_array(
         stream,
         (void*)sample->payload,
-        (1048560),
+        (1484),
         CDR_CHAR_TYPE)) {
         return RTI_FALSE;
     }
@@ -249,7 +249,7 @@ largePacket_cdr_deserialize(
     if (!CDR_Stream_deserialize_primitive_array(
         stream,
         (void*)sample->payload,
-        (1048560),
+        (1484),
         CDR_CHAR_TYPE)) {
         return RTI_FALSE;
     }
@@ -275,7 +275,7 @@ largePacket_get_serialized_sample_max_size(
         current_alignment);
 
     current_alignment += CDR_get_max_size_serialized_primitive_array(
-        current_alignment, (1048560), CDR_CHAR_TYPE);
+        current_alignment, (1484), CDR_CHAR_TYPE);
 
     return  current_alignment - initial_alignment;
 }
